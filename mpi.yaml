@@ -1,0 +1,90 @@
+esphome:
+  name: mpi
+  friendly_name: mpi
+
+esp32:
+  board: esp32dev
+#  framework:
+#    type: arduino
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  platform: esphome
+  password: !secret ota_password
+
+logger:
+  level: DEBUG
+
+ethernet:
+  type: LAN8720
+  mdc_pin: GPIO23
+  mdio_pin: GPIO18
+  clk_mode: GPIO0_OUT
+
+
+external_components:
+  - source: components
+
+uart:
+  tx_pin: GPIO17
+  rx_pin: GPIO34
+  baud_rate: 2400
+  debug:
+    direction: BOTH
+    dummy_receiver: false
+#    after:
+#      delimiter: "\r"
+    sequence:
+      - lambda: UARTDebug::log_string(direction, bytes);
+
+mpi:
+  - id: inverter0
+
+#interval:
+#  - interval: 10s
+#    then:
+#      uart.write: "^P003GS\r"
+
+#pipsolar:
+#  - id: inverter0
+
+#sensor:
+#  - platform: pipsolar
+#    pipsolar_id: inverter0
+#    grid_voltage:
+#      id: inverter0_grid_voltage
+#      name: inverter0_grid_voltage
+
+#sensor:
+#  - platform: template
+#    name: "temperature_module"
+#    id: temperature_module
+
+canbus:
+  - platform: esp32_can
+    tx_pin: GPIO33
+    rx_pin: GPIO32
+    can_id: 1
+    bit_rate: 500kbps
+    on_frame:
+    - can_id: 0x351
+      then:
+      - lambda: |-
+          ESP_LOGD("pylontech", "Chargevoltage %f",  (float)(int16_t)(x[0] | x[1] << 8) * 0.1f );
+          ESP_LOGD("pylontech", "Chargelimit %f",    (float)(int16_t)(x[2] | x[3] << 8) * 0.1f );
+          ESP_LOGD("pylontech", "Dischargelimit %f", (float)(int16_t)(x[4] | x[5] << 8) * 0.1f );
+    - can_id: 0x355
+      then:
+      - lambda: |-
+          ESP_LOGD("pylontech", "SOC %i",  x[0] | x[1] << 8 );
+          ESP_LOGD("pylontech", "SOH %i",  x[2] | x[3] << 8 );
+    - can_id: 0x356
+      then:
+      - lambda: |-
+          ESP_LOGD("pylontech", "voltage_module %f",     (float)(int16_t)(x[0] | x[1] << 8) * 0.01f );
+          ESP_LOGD("pylontech", "current_module %f",     (float)(int16_t)(x[2] | x[3] << 8) * 0.1f );
+          ESP_LOGD("pylontech", "temperature_module %f", (float)(int16_t)(x[4] | x[5] << 8) * 0.1f );
